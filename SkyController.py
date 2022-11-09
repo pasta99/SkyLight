@@ -17,7 +17,7 @@ class SkyController:
         
         self.reset()
         ### Insert initial Generator here
-        self.generator = CircleGenerator(x, y, self.dt)
+        self.generator = DropGenerator(x, y, self.dt)
         ###
 
         self.running = False

@@ -234,22 +234,36 @@ class CircleGenerator(SkyGenerator):
                 grid[x][y].set_color_ci(self.color,intensity)
         return grid
 
-class LinearInterpGenerator(SkyGenerator):
-    def get_name(self):
-        return "Linear interpolation"
-    def generate_image(self, t, it):
-        arr = []
-        max_p = self.spike_sin(t * 10) * 0.8
+class RingGenerator(SkyGenerator):
+    name = "Ring"
+    mode = 0
+    min_radius = 0.15
+    max_radius = 0.55
+    radius = 0.15
+    min_speed = 0.25
+    max_speed = 3
+    ring_width = 0.4
+
+    def generate_image(self, t, it, grid):
+        if self.mode == 0:
+            self.radius += self.get_speed() *  self.dt
+        else:
+            self.radius -= self.get_speed() *  self.dt
+
+        if self.radius > self.max_radius:
+            self.mode = 1
+            self.set_random_color()
+        elif self.radius < self.min_radius:
+            self.mode = 0
+            self.set_random_color()
+        
         for x in range(self.x):
-            subarr = []
             for y in range(self.y):
                 x_n, y_n = self.normalize(x, y)
                 magnitude = self.length(x_n, y_n)
-                intensity = np.interp(magnitude, [0, max_p, 0.8], [0, 1, 0])
-                intensity = np.interp(magnitude, [max_p - 0.1, max_p, max_p + 0.1], [0, 1, 0])
-                subarr.append(LightSpec((255, 255, 0, intensity)))
-            arr.append(subarr)
-        return arr
+                intensity = np.interp(magnitude, [(1 - self.ring_width / 2) * self.radius, self.radius, (1 + self.ring_width / 2) * self.radius], [0, 1, 0])
+                grid[x][y].set_color_ci(self.color,intensity)
+        return grid
 
 class DropGenerator(SkyGenerator):
     name = "Rain"
@@ -257,16 +271,20 @@ class DropGenerator(SkyGenerator):
     points = []
     speed = []
     times = []
+    colors = []
     next_drop_time = 0
 
-    def generate_image(self, t, it):
-        arr = []
+    def generate_image(self, t, it, grid):
         max_p = self.spike_sin(t * 10) * 0.8
         if it == self.next_drop_time:
             self.points.append([random.random() - 0.5, random.random() - 0.5])
             self.speed.append(3)
             self.times.append(t)
             self.next_drop_time += np.random.choice(range(20, 40))
+            if self.random_mode:
+                self.colors.append(self.get_random_color())
+            else:
+                self.colors.append(self.color)
         for x in range(self.x):
             subarr = []
             for y in range(self.y):
@@ -278,15 +296,13 @@ class DropGenerator(SkyGenerator):
                     radius = (t - self.times[i]) * self.speed[i]
                     if radius > 2:
                         delete_list.append(i)
-                    intensity += np.interp(magnitude_to_point, [radius - self.thickness / 2, radius, radius + self.thickness / 2], [0, 1, 0])
-                intensity = min(1, intensity)
-                subarr.append(LightSpec((0, 0, 255, intensity)))
+                    intensity = np.interp(magnitude_to_point, [radius - self.thickness / 2, radius, radius + self.thickness / 2], [0, 1, 0])
+                    grid[x][y].set_color_ci(self.colors[i], intensity)
                 for i in range(len(delete_list)):
                     del self.points[i]
                     del self.speed[i]
                     del self.times[i]
-            arr.append(subarr)
-        return arr
+        return grid
 
 class ColorPulseGenerator(SkyGenerator):
     name = "Colorful pulse"
@@ -298,7 +314,7 @@ class ColorPulseGenerator(SkyGenerator):
     colors = [[255, 0, 0], [0, 0, 255], [0, 255, 0]]
     colorindex = []
 
-    def generate_image(self, t, it):
+    def generate_image(self, t, it, grid):
         arr = []
         max_p = self.spike_sin(t * 10) * 0.8
         if it == self.next_drop_time:
@@ -334,21 +350,27 @@ class ColorPulseGenerator(SkyGenerator):
         return arr
 
 class SquareGenerator(SkyGenerator):
-    def get_name(self):
-        return "Square"
-    def generate_image(self, t, it):
-        arr = []
-        num_it = it % (self.x * self.y) 
-        total = self.x * self.y
+    name = "Square"
+    min_radius = 0
+    max_radius = 0.6
+    radius = 0
+    min_speed = 0.2
+    max_speed = 1.5
+
+    def generate_image(self, t, it, grid):
+
+        self.radius += self.get_speed() *  self.dt
+
+        if self.radius > self.max_radius:
+            self.radius = self.min_radius
+            self.set_random_color()
+
         for x in range(self.x):
-            subarr = []
             for y in range(self.y):
                 x_n, y_n = self.normalize(x, y)
-                magnitude = self.length(x_n, y_n)
-                intensity = 1 if max(x_n**2, y_n**2) < (t) % .4 else 0
-                subarr.append(LightSpec((255, 255, 0, intensity)))
-            arr.append(subarr)
-        return arr
+                intensity = 1 if max(abs(x_n), abs(y_n)) < self.radius else 0
+                grid[x][y].set_color_ci(self.color, intensity)
+        return grid
 
 class BandGenerator(SkyGenerator):
     def get_name(self):
